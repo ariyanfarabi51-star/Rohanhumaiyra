@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Calculator</title>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;user-select:none;}
+body{background:#1c1c1e;height:100vh;overflow:hidden;font-family:-apple-system,'SF Pro Display',sans-serif;}
+
+/* ══════════ CALCULATOR ══════════ */
+#calcScreen{
+  height:100vh;display:flex;flex-direction:column;max-width:420px;margin:auto;
+  background:#1c1c1e;
+}
+.calc-display{
+  flex:1;display:flex;flex-direction:column;justify-content:flex-end;
+  padding:20px 28px 10px;
+}
+.calc-expr{
+  font-size:22px;color:rgba(255,255,255,0.45);text-align:right;
+  min-height:30px;margin-bottom:4px;letter-spacing:0.5px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;
+}
+.calc-main{
+  font-size:72px;color:#fff;text-align:right;font-weight:200;
+  letter-spacing:-2px;line-height:1;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;
+}
+.calc-main.small{font-size:48px;}
+.calc-main.xsmall{font-size:36px;}
+
+.calc-btns{
+  display:grid;grid-template-columns:repeat(4,1fr);
+  gap:12px;padding:16px 14px 36px;
+}
+.cb{
+  height:72px;border-radius:50%;border:none;
+  font-size:28px;font-weight:400;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:opacity .08s;position:relative;overflow:hidden;
+}
+.cb:active{opacity:0.6;}
+.cb.gray{background:#a5a5a5;color:#1c1c1e;}
+.cb.dark{background:#333335;color:#fff;}
+.cb.orange{background:#ff9f0a;color:#fff;}
+.cb.zero{border-radius:40px;justify-content:flex-start;padding-left:26px;font-size:26px;}
+
+/* ripple */
+.ripple{
+  position:absolute;border-radius:50%;background:rgba(255,255,255,0.25);
+  transform:scale(0);animation:rip .4s linear;pointer-events:none;
+}
+@keyframes rip{to{transform:scale(4);opacity:0;}}
+
+/* ══════════ PIN SCREEN (hidden) ══════════ */
+#pinScreen{
+  position:fixed;inset:0;z-index:9999;
+  background:linear-gradient(160deg,#0a0a0a,#1a1a2e,#0a0a0a);
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+}
+.pin-logo{font-size:62px;margin-bottom:8px;animation:hb 1.3s infinite;}
+@keyframes hb{0%,100%{transform:scale(1)}50%{transform:scale(1.13)}}
+.pin-title{color:#fff;font-size:22px;font-weight:700;margin-bottom:4px;}
+.pin-sub{color:rgba(255,255,255,0.4);font-size:12px;margin-bottom:30px;}
+.pin-user-sel{display:flex;gap:12px;margin-bottom:26px;}
+.pub{
+  padding:10px 26px;border:2px solid rgba(255,255,255,0.15);border-radius:30px;
+  background:rgba(255,255,255,0.07);color:#fff;font-size:14px;cursor:pointer;transition:all .18s;
+}
+.pub.active{background:#128c7e;border-color:#128c7e;font-weight:700;}
+.pin-dots{display:flex;gap:12px;margin-bottom:8px;}
+.pd{
+  width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,0.3);
+  background:transparent;transition:all .12s;
+}
+.pd.on{background:#25d366;border-color:#25d366;transform:scale(1.2);}
+.pd.err{background:#e53935;border-color:#e53935;animation:shk .3s;}
+@keyframes shk{0%,100%{transform:translateX(0)}25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
+.pin-err{color:#ff6b6b;font-size:12px;margin-bottom:18px;min-height:17px;text-align:center;}
+.pin-grid{
+  display:grid;grid-template-columns:repeat(3,70px);
+  grid-template-rows:repeat(4,70px);gap:10px;
+}
+.pk{
+  width:70px;height:70px;border-radius:50%;border:none;
+  background:rgba(255,255,255,0.09);color:#fff;
+  font-size:21px;font-weight:600;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  transition:background .12s,transform .1s;
+}
+.pk:active,.pk.pr{background:rgba(37,211,102,0.22);transform:scale(0.91);}
+.pk.emp{background:transparent;cursor:default;}
+.pk.del{font-size:17px;}
+.pk-sub{font-size:8px;color:rgba(255,255,255,0.38);margin-top:1px;letter-spacing:1px;}
+.pin-back{color:rgba(255,255,255,0.3);font-size:11px;margin-top:18px;cursor:pointer;}
+
+/* ══════════ CHAT SCREEN ══════════ */
+#chatScreen{
+  position:fixed;inset:0;z-index:9998;
+  display:none;flex-direction:column;max-width:500px;margin:auto;
+  background:#efe7dd;
+}
+.hdr{
+  background:#075e54;color:#fff;padding:10px 14px;
+  display:flex;justify-content:space-between;align-items:center;
+  box-shadow:0 2px 8px rgba(0,0,0,.3);flex-shrink:0;
+}
+.hdr-l{display:flex;align-items:center;gap:10px;}
+.ava{width:40px;height:40px;border-radius:50%;background:#25d366;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.hdr-name{font-size:15px;font-weight:700;}
+.hdr-st{font-size:10px;color:#b2dfdb;}
+.hdr-r{display:flex;gap:4px;}
+.hbtn{width:37px;height:37px;border-radius:50%;border:none;background:transparent;color:#fff;font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .13s;}
+.hbtn:active{background:rgba(255,255,255,.18);}
+
+/* messages */
+#msgList{flex:1;padding:10px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;}
+#msgList::-webkit-scrollbar{width:3px;}
+#msgList::-webkit-scrollbar-thumb{background:rgba(0,0,0,.13);border-radius:3px;}
+.datediv{text-align:center;margin:6px 0;}
+.datediv span{background:rgba(0,0,0,.1);color:#555;font-size:10px;padding:3px 10px;border-radius:8px;}
+.msg{padding:7px 11px;border-radius:12px;max-width:78%;position:relative;box-shadow:0 1px 2px rgba(0,0,0,.1);word-break:break-word;}
+.sent{align-self:flex-end;background:#dcf8c6;border-bottom-right-radius:3px;}
+.recv{align-self:flex-start;background:#fff;border-bottom-left-radius:3px;}
+.stag{font-size:10px;font-weight:700;color:#075e54;margin-bottom:2px;display:block;}
+.mbody{font-size:14px;line-height:1.45;}
+.mfoot{display:flex;justify-content:flex-end;align-items:center;gap:4px;margin-top:2px;}
+.mtime{font-size:9px;color:#999;}
+.mtick{font-size:10px;color:#34b7f1;font-weight:700;}
+.mimg{max-width:100%;border-radius:8px;cursor:pointer;display:block;margin-bottom:3px;max-height:230px;object-fit:cover;}
+.mvid{max-width:100%;border-radius:8px;margin-bottom:3px;}
+.vwrap{display:flex;align-items:center;gap:8px;min-width:185px;}
+.vplay{width:36px;height:36px;border-radius:50%;background:#075e54;border:none;color:#fff;font-size:15px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.vwave{flex:1;height:26px;}
+.vdur{font-size:10px;color:#888;min-width:26px;text-align:right;}
+.mdoc{display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.04);border-radius:8px;padding:8px 10px;text-decoration:none;color:inherit;}
+.doci{font-size:26px;}
+.docn{font-size:12px;color:#075e54;font-weight:600;word-break:break-all;}
+.rerow{display:flex;flex-wrap:wrap;gap:3px;margin-top:3px;}
+.rebub{background:rgba(0,0,0,.08);border-radius:10px;padding:1px 5px;font-size:12px;}
+.msg:hover .retray{display:flex;}
+.retray{display:none;position:absolute;bottom:-20px;right:5px;gap:2px;background:#fff;border-radius:14px;padding:3px 8px;box-shadow:0 2px 10px rgba(0,0,0,.18);z-index:6;}
+.re{font-size:15px;cursor:pointer;}
+.re:active{transform:scale(1.35);}
+
+/* input */
+.inp-area{padding:7px 9px;background:#f0f0f0;display:flex;gap:7px;align-items:flex-end;flex-shrink:0;position:relative;}
+.att-menu{
+  position:absolute;bottom:66px;left:8px;background:#fff;border-radius:16px;
+  box-shadow:0 4px 24px rgba(0,0,0,.18);display:none;flex-direction:column;overflow:hidden;z-index:20;min-width:175px;
+}
+.att-menu.open{display:flex;}
+.atti{display:flex;align-items:center;gap:10px;padding:13px 17px;cursor:pointer;font-size:14px;transition:background .1s;}
+.atti:active{background:#f5f5f5;}
+.attico{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;}
+.epicker{position:absolute;bottom:66px;left:8px;right:8px;background:#fff;border-radius:16px;padding:12px;box-shadow:0 4px 20px rgba(0,0,0,.18);display:none;z-index:20;max-height:190px;overflow-y:auto;}
+.epicker.open{display:block;}
+.egrid{display:flex;flex-wrap:wrap;gap:6px;}
+.eitem{font-size:22px;cursor:pointer;padding:2px;border-radius:6px;}
+.eitem:active{background:#f0f0f0;}
+.winp{flex:1;background:#fff;border-radius:25px;display:flex;align-items:center;padding:5px 12px;gap:6px;}
+#msgIn{flex:1;border:none;outline:none;font-size:14px;padding:6px 0;background:transparent;resize:none;max-height:100px;font-family:inherit;}
+.icob{font-size:20px;cursor:pointer;color:#888;background:none;border:none;padding:0;}
+.circ{width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:19px;transition:transform .1s;flex-shrink:0;}
+.circ:active{transform:scale(.9);}
+.micb{background:#128c7e;color:#fff;}
+.micb.rec{background:#e53935;animation:puls .8s infinite;}
+.sndb{background:#128c7e;color:#fff;}
+@keyframes puls{0%,100%{box-shadow:0 0 0 0 rgba(229,57,53,.5)}50%{box-shadow:0 0 0 9px rgba(229,57,53,0)}}
+
+/* AUDIO CALL */
+#audioCall{position:fixed;inset:0;background:linear-gradient(160deg,#064e44,#0a7b6e);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:500;color:#fff;}
+#audioCall.active{display:flex;}
+.ca-av{font-size:90px;margin-bottom:14px;}
+.ca-nm{font-size:26px;font-weight:700;margin-bottom:5px;}
+.ca-st{font-size:14px;color:rgba(255,255,255,.6);margin-bottom:8px;}
+.ca-tmr{font-size:22px;font-weight:700;margin-bottom:44px;min-height:28px;}
+.ca-bts{display:flex;gap:26px;}
+.cabtn{width:64px;height:64px;border-radius:50%;border:none;font-size:25px;cursor:pointer;transition:transform .1s;}
+.cabtn:active{transform:scale(.87);}
+.ca-mu,.ca-sp{background:rgba(255,255,255,.2);color:#fff;}
+.ca-hg{background:#e53935;color:#fff;}
+
+/* VIDEO CALL */
+#videoCall{position:fixed;inset:0;background:#111;display:none;flex-direction:column;z-index:500;}
+#videoCall.active{display:flex;}
+#remoteVid{width:100%;flex:1;object-fit:cover;background:#1a1a1a;}
+.locwrap{position:absolute;top:16px;right:14px;width:92px;height:130px;border-radius:12px;overflow:hidden;border:2px solid #25d366;box-shadow:0 4px 14px rgba(0,0,0,.5);}
+#localVid{width:100%;height:100%;object-fit:cover;background:#222;}
+.vst{position:absolute;top:16px;left:14px;color:#fff;font-size:12px;background:rgba(0,0,0,.45);padding:4px 10px;border-radius:10px;}
+.vbts{position:absolute;bottom:26px;left:0;right:0;display:flex;justify-content:center;gap:16px;}
+.vbtn{width:54px;height:54px;border-radius:50%;border:none;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.vbtn:active{transform:scale(.87);}
+.vhg{background:#e53935;color:#fff;}
+.vmu,.vcm,.vfl{background:rgba(255,255,255,.18);color:#fff;}
+
+/* IMG VIEWER */
+#imgViewer{position:fixed;inset:0;background:rgba(0,0,0,.93);display:none;align-items:center;justify-content:center;z-index:600;}
+#imgViewer.active{display:flex;}
+#viewImg{max-width:96vw;max-height:90vh;border-radius:8px;}
+.ivc{position:absolute;top:14px;right:18px;color:#fff;font-size:30px;cursor:pointer;}
+
+/* TOAST */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.72);color:#fff;padding:8px 18px;border-radius:20px;font-size:13px;z-index:700;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;}
+.toast.show{opacity:1;}
+#incomingCall.active{display:flex!important;}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+</style>
+</head>
+<body>
+
+<!-- ══════ CALCULATOR ══════ -->
+<div id="calcScreen">
+  <div class="calc-display">
+    <div class="calc-expr" id="expr"></div>
+    <div class="calc-main" id="disp">0</div>
+  </div>
+  <div class="calc-btns">
+    <button class="cb gray" onclick="calcAC()">AC</button>
+    <button class="cb gray" onclick="calcSign()">+/-</button>
+    <button class="cb gray" onclick="calcPct()">%</button>
+    <button class="cb orange" onclick="calcOp('÷')">÷</button>
+
+    <button class="cb dark" onclick="calcNum('7')">7</button>
+    <button class="cb dark" onclick="calcNum('8')">8</button>
+    <button class="cb dark" onclick="calcNum('9')">9</button>
+    <button class="cb orange" onclick="calcOp('×')">×</button>
+
+    <button class="cb dark" onclick="calcNum('4')">4</button>
+    <button class="cb dark" onclick="calcNum('5')">5</button>
+    <button class="cb dark" onclick="calcNum('6')">6</button>
+    <button class="cb orange" onclick="calcOp('−')">−</button>
+
+    <button class="cb dark" onclick="calcNum('1')">1</button>
+    <button class="cb dark" onclick="calcNum('2')">2</button>
+    <button class="cb dark" onclick="calcNum('3')">3</button>
+    <button class="cb orange" onclick="calcOp('+')">+</button>
+
+    <button class="cb dark zero" style="grid-column:span 2" onclick="calcNum('0')">0</button>
+    <button class="cb dark" onclick="calcDot()">.</button>
+    <button class="cb orange" onclick="calcEq()">=</button>
+  </div>
+</div>
+
+<!-- ══════ PIN SCREEN ══════ -->
+<div id="pinScreen">
+  <div class="pin-logo">💑</div>
+  <div class="pin-title">Rohan ❤️ Humaiyra</div>
+  <div class="pin-sub">Secret Chat 🔐 — PIN দাও</div>
+  <div style="color:rgba(255,255,255,0.5);font-size:12px;margin-bottom:16px;">তোমার PIN দাও — নিজে নিজে চিনে নেবে 🔐</div>
+  <div class="pin-dots" id="pinDots">
+    <div class="pd" id="p0"></div><div class="pd" id="p1"></div>
+    <div class="pd" id="p2"></div><div class="pd" id="p3"></div>
+    <div class="pd" id="p4"></div><div class="pd" id="p5"></div>
+  </div>
+  <div class="pin-err" id="pinErr"></div>
+  <div class="pin-grid">
+    <button class="pk" onclick="pk('1')">1</button>
+    <button class="pk" onclick="pk('2')">2<div class="pk-sub">ABC</div></button>
+    <button class="pk" onclick="pk('3')">3<div class="pk-sub">DEF</div></button>
+    <button class="pk" onclick="pk('4')">4<div class="pk-sub">GHI</div></button>
+    <button class="pk" onclick="pk('5')">5<div class="pk-sub">JKL</div></button>
+    <button class="pk" onclick="pk('6')">6<div class="pk-sub">MNO</div></button>
+    <button class="pk" onclick="pk('7')">7<div class="pk-sub">PQRS</div></button>
+    <button class="pk" onclick="pk('8')">8<div class="pk-sub">TUV</div></button>
+    <button class="pk" onclick="pk('9')">9<div class="pk-sub">WXYZ</div></button>
+    <button class="pk emp"></button>
+    <button class="pk" onclick="pk('0')">0</button>
+    <button class="pk del" onclick="pkDel()">⌫</button>
+  </div>
+  <div class="pin-back" onclick="backToCalc()">← ক্যালকুলেটরে ফিরে যাও</div>
+</div>
+
+<!-- ══════ CHAT SCREEN ══════ -->
+<div id="chatScreen">
+  <div class="hdr">
+    <div class="hdr-l">
+      <div class="ava">💑</div>
+      <div>
+        <div class="hdr-name">Rohan ❤️ Humaiyra</div>
+        <div class="hdr-st" id="onlineSt">Online 🟢</div>
+      </div>
+    </div>
+    <div class="hdr-r">
+      <button class="hbtn" onclick="startAudioCall()">📞</button>
+      <button class="hbtn" onclick="startVideoCall()">📹</button>
+      <button class="hbtn" onclick="openSettings()">⚙️</button>
+      <button class="hbtn" onclick="lockApp()" title="Lock">🔒</button>
+    </div>
+  </div>
+  <div id="msgList"></div>
+  <div class="att-menu" id="attMenu">
+    <div class="atti" onclick="pickF('imgIn')"><div class="attico" style="background:#e8f5e9">🖼️</div>ছবি / ভিডিও</div>
+    <div class="atti" onclick="pickF('docIn')"><div class="attico" style="background:#e3f2fd">📄</div>ডকুমেন্ট</div>
+    <div class="atti" onclick="pickF('audIn')"><div class="attico" style="background:#fce4ec">🎵</div>অডিও ফাইল</div>
+    <input type="file" id="imgIn" accept="image/*,video/*" style="display:none" onchange="upF(this,'media')">
+    <input type="file" id="docIn" accept=".pdf,.doc,.docx,.txt" style="display:none" onchange="upF(this,'doc')">
+    <input type="file" id="audIn" accept="audio/*" style="display:none" onchange="upF(this,'audio')">
+  </div>
+  <div class="epicker" id="epicker"><div class="egrid" id="egrid"></div></div>
+  <div class="inp-area">
+    <button class="circ micb" id="micBtn" onclick="toggleRec()">🎤</button>
+    <div class="winp">
+      <button class="icob" onclick="toggleEmoji()">😊</button>
+      <textarea id="msgIn" placeholder="এখানে লিখুন..." rows="1" oninput="grow(this)" onkeydown="kd(event)"></textarea>
+      <button class="icob" onclick="toggleAtt()">📎</button>
+    </div>
+    <button class="circ sndb" onclick="sendMsg()">➤</button>
+  </div>
+</div>
+
+<!-- AUDIO CALL -->
+<div id="audioCall">
+  <div class="ca-av">💑</div>
+  <div class="ca-nm" id="caNm">Humaiyra</div>
+  <div class="ca-st" id="caSt">কল করা হচ্ছে...</div>
+  <div class="ca-tmr" id="caTmr"></div>
+  <div class="ca-bts">
+    <button class="cabtn ca-mu" id="muteBtn" onclick="togMute()">🎤</button>
+    <button class="cabtn ca-hg" onclick="endCall()">📵</button>
+    <button class="cabtn ca-sp" onclick="togSpk()">🔊</button>
+  </div>
+</div>
+
+<!-- VIDEO CALL -->
+<div id="videoCall">
+  <video id="remoteVid" autoplay playsinline></video>
+  <div id="remoteAvatar" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;pointer-events:none;">
+    <div style="font-size:90px;margin-bottom:10px;">💑</div>
+    <div id="remoteNm" style="font-size:22px;font-weight:700;"></div>
+    <div id="vidSt" style="font-size:13px;color:rgba(255,255,255,.6);margin-top:6px;background:rgba(0,0,0,.35);padding:4px 12px;border-radius:10px;">কানেক্ট হচ্ছে...</div>
+  </div>
+  <div class="locwrap"><video id="localVid" autoplay playsinline muted></video></div>
+  <div class="vbts">
+    <button class="vbtn vmu" id="vmute" onclick="togVMute()">🎤</button>
+    <button class="vbtn vhg" onclick="endVideoCall()">📵</button>
+    <button class="vbtn vcm" id="vcam" onclick="togCam()">📷</button>
+    <button class="vbtn vfl" onclick="flipCam()">🔄</button>
+  </div>
+</div>
+
+<!-- IMG VIEWER -->
+<div id="imgViewer" onclick="closeViewer()">
+  <span class="ivc">✕</span>
+  <img id="viewImg" src="" alt="">
+</div>
+
+<!-- ══════ SETTINGS PANEL ══════ -->
+<div id="settingsPanel" style="display:none;position:fixed;inset:0;z-index:9997;background:rgba(0,0,0,0.6);align-items:flex-end;justify-content:center;">
+  <div style="background:#fff;width:100%;max-width:500px;border-radius:24px 24px 0 0;padding:24px 20px 40px;animation:slideUp .25s ease;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;">
+      <span style="font-size:18px;font-weight:700;color:#111;">⚙️ সেটিংস</span>
+      <button onclick="closeSettings()" style="border:none;background:none;font-size:22px;cursor:pointer;color:#888;">✕</button>
+    </div>
+
+    <!-- Current PIN info -->
+    <div style="background:#f0f9f7;border-radius:14px;padding:14px 16px;margin-bottom:16px;">
+      <div style="font-size:12px;color:#666;margin-bottom:4px;">বর্তমান PIN</div>
+      <div style="font-size:22px;letter-spacing:6px;font-weight:700;color:#075e54;" id="curPinShow">••••••</div>
+      <div style="font-size:11px;color:#aaa;margin-top:4px;">PIN দেখতে চাইলে ট্যাপ করো 👆</div>
+      <button onclick="toggleShowPin()" style="margin-top:8px;border:none;background:#e0f2f1;color:#075e54;padding:6px 14px;border-radius:20px;font-size:12px;cursor:pointer;">👁 PIN দেখাও</button>
+    </div>
+
+    <!-- Change PIN -->
+    <div style="background:#fafafa;border-radius:14px;padding:16px;margin-bottom:14px;">
+      <div style="font-size:14px;font-weight:600;color:#333;margin-bottom:12px;">🔑 PIN পরিবর্তন করো</div>
+
+      <div style="margin-bottom:10px;">
+        <div style="font-size:11px;color:#888;margin-bottom:4px;">পুরানো PIN</div>
+        <input id="oldPin" type="password" inputmode="numeric" maxlength="6" placeholder="৬ সংখ্যার পুরানো PIN"
+          style="width:100%;border:1.5px solid #ddd;border-radius:10px;padding:10px 14px;font-size:16px;letter-spacing:4px;outline:none;">
+      </div>
+
+      <div style="margin-bottom:10px;">
+        <div style="font-size:11px;color:#888;margin-bottom:4px;">নতুন PIN</div>
+        <input id="newPin" type="password" inputmode="numeric" maxlength="6" placeholder="৬ সংখ্যার নতুন PIN"
+          style="width:100%;border:1.5px solid #ddd;border-radius:10px;padding:10px 14px;font-size:16px;letter-spacing:4px;outline:none;">
+      </div>
+
+      <div style="margin-bottom:14px;">
+        <div style="font-size:11px;color:#888;margin-bottom:4px;">নতুন PIN নিশ্চিত করো</div>
+        <input id="confirmPin" type="password" inputmode="numeric" maxlength="6" placeholder="আবার দাও"
+          style="width:100%;border:1.5px solid #ddd;border-radius:10px;padding:10px 14px;font-size:16px;letter-spacing:4px;outline:none;">
+      </div>
+
+      <div id="pinChangeErr" style="color:#e53935;font-size:12px;margin-bottom:10px;min-height:16px;text-align:center;"></div>
+
+      <button onclick="changePin()"
+        style="width:100%;background:#075e54;color:#fff;border:none;border-radius:12px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;">
+        ✅ PIN পরিবর্তন করো
+      </button>
+    </div>
+
+    <div style="text-align:center;color:#aaa;font-size:11px;">PIN ভুললে app এ access পাওয়া যাবে না</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- REMOTE AUDIO (hidden) -->
+<audio id="remoteAud" autoplay playsinline style="display:none"></audio>
+
+<!-- INCOMING CALL UI -->
+<div id="incomingCall" style="display:none;position:fixed;inset:0;z-index:999;background:linear-gradient(160deg,#064e44,#0a7b6e);flex-direction:column;align-items:center;justify-content:center;color:#fff;">
+  <div style="font-size:80px;margin-bottom:12px;animation:hb 1s infinite;">💑</div>
+  <div id="icCaller" style="font-size:26px;font-weight:700;margin-bottom:6px;"></div>
+  <div id="icType" style="font-size:14px;color:rgba(255,255,255,.6);margin-bottom:50px;"></div>
+  <div style="display:flex;gap:50px;">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+      <button onclick="rejectCall()" style="width:68px;height:68px;border-radius:50%;border:none;background:#e53935;color:#fff;font-size:26px;cursor:pointer;">📵</button>
+      <span style="font-size:12px;color:rgba(255,255,255,.7);">রিজেক্ট</span>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+      <button onclick="acceptCall()" style="width:68px;height:68px;border-radius:50%;border:none;background:#25d366;color:#fff;font-size:26px;cursor:pointer;">📞</button>
+      <span style="font-size:12px;color:rgba(255,255,255,.7);">রিসিভ</span>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════
+   FIREBASE
+══════════════════════════════════ */
+firebase.initializeApp({
+  apiKey:"AIzaSyCFBj-6URVjyCsO3ERZQGroPi1eWAUaV6M",
+  authDomain:"sallu-c83fa.firebaseapp.com",
+  databaseURL:"https://sallu-c83fa-default-rtdb.firebaseio.com",
+  projectId:"sallu-c83fa",
+  storageBucket:"sallu-c83fa.firebasestorage.app",
+  messagingSenderId:"631719412254",
+  appId:"1:631719412254:web:67b174371e595644a6e40f"
+});
+const db=firebase.database();
+const stor=firebase.storage();
+loadPinFromFirebase();
+
+/* ══════════════════════════════════
+   CALCULATOR LOGIC
+══════════════════════════════════ */
+let cVal='0', cOp=null, cPrev=null, cNew=false, cExpr='';
+// Secret sequence tracker
+let secBuf=''; // tracks "41+38="
+
+function setDisp(v){
+  const d=document.getElementById('disp');
+  const s=String(v);
+  d.textContent=s;
+  d.className='calc-main'+(s.length>10?' xsmall':s.length>7?' small':'');
+}
+
+function calcNum(n){
+  ripple(event);
+  if(cNew){cVal=n;cNew=false;}
+  else cVal=cVal==='0'?n:cVal+n;
+  setDisp(cVal);
+  trackSecret(n);
+}
+function calcOp(op){
+  ripple(event);
+  cPrev=parseFloat(cVal);cOp=op;cNew=true;
+  cExpr=cVal+' '+op;
+  document.getElementById('expr').textContent=cExpr;
+  trackSecret(op==='+'?'+':op==='−'?'-':op==='×'?'*':'/');
+}
+function calcEq(){
+  ripple(event);
+  if(cOp===null||cPrev===null) return;
+  const cur=parseFloat(cVal);
+  let res;
+  if(cOp==='÷') res=cPrev/cur;
+  else if(cOp==='×') res=cPrev*cur;
+  else if(cOp==='−') res=cPrev-cur;
+  else res=cPrev+cur;
+  // show nice result
+  const r=parseFloat(res.toFixed(10));
+  cExpr=cExpr+cVal+' =';
+  document.getElementById('expr').textContent=cExpr;
+  setDisp(r);
+  cVal=String(r); cOp=null; cPrev=null; cNew=true;
+  trackSecret('=');
+}
+function calcAC(){ ripple(event); cVal='0';cOp=null;cPrev=null;cNew=false;cExpr='';document.getElementById('expr').textContent='';setDisp('0');secBuf=''; }
+function calcSign(){ ripple(event); cVal=String(-parseFloat(cVal));setDisp(cVal); }
+function calcPct(){ ripple(event); cVal=String(parseFloat(cVal)/100);setDisp(cVal); }
+function calcDot(){
+  ripple(event);
+  if(cNew){cVal='0.';cNew=false;}
+  else if(!cVal.includes('.')) cVal+='.';
+  setDisp(cVal);
+}
+
+/* Secret sequence: 41+38= triggers PIN */
+const SECRET_SEQ='41+38=';
+function trackSecret(ch){
+  secBuf+=ch;
+  if(secBuf.length>SECRET_SEQ.length) secBuf=secBuf.slice(-SECRET_SEQ.length);
+  if(secBuf===SECRET_SEQ){
+    secBuf='';
+    setTimeout(showPin,300);
+  }
+}
+
+function ripple(e){
+  const btn=e.currentTarget||e.target;
+  const r=document.createElement('span'); r.className='ripple';
+  const sz=Math.max(btn.clientWidth,btn.clientHeight);
+  r.style.width=r.style.height=sz+'px';
+  r.style.left=r.style.top='0px';
+  btn.appendChild(r); setTimeout(()=>r.remove(),450);
+}
+
+/* ══════════════════════════════════
+   PIN LOGIC  — Secret PIN: 684138
+══════════════════════════════════ */
+const PIN_ROHAN='684138';
+const PIN_HUMAIYRA='684139';
+const PIN_LEN=6;
+let pinBuf='', pinUser='Rohan';
+// per-user live PINs
+let PIN_ROHAN_LIVE=PIN_ROHAN;
+let PIN_HUMAIYRA_LIVE=PIN_HUMAIYRA;
+let SECRET_PIN_LIVE=PIN_ROHAN; // for settings compat
+
+/* Firebase থেকে PIN load */
+function loadPinFromFirebase(){
+  db.ref('settings/pinRohan').once('value').then(snap=>{ if(snap.val()) PIN_ROHAN_LIVE=snap.val(); });
+  db.ref('settings/pinHumaiyra').once('value').then(snap=>{ if(snap.val()) PIN_HUMAIYRA_LIVE=snap.val(); });
+}
+
+function showPin(){
+  document.getElementById('calcScreen').style.display='none';
+  document.getElementById('pinScreen').style.display='flex';
+  clearPin();
+}
+function backToCalc(){
+  document.getElementById('pinScreen').style.display='none';
+  document.getElementById('calcScreen').style.display='flex';
+  clearPin();
+}
+function pickUser(u){
+  pinUser=u;
+  clearPin();
+}
+function pk(d){
+  if(pinBuf.length>=PIN_LEN) return;
+  pinBuf+=d;updDots(false);
+  if(pinBuf.length===PIN_LEN) setTimeout(checkPin,130);
+}
+function pkDel(){
+  if(!pinBuf.length) return;
+  pinBuf=pinBuf.slice(0,-1); updDots(false);
+  document.getElementById('pinErr').textContent='';
+}
+function updDots(err){
+  for(let i=0;i<PIN_LEN;i++){
+    const d=document.getElementById('p'+i);
+    d.classList.toggle('on',i<pinBuf.length);
+    d.classList.toggle('err',err);
+  }
+}
+function checkPin(){
+  if(pinBuf===PIN_ROHAN_LIVE){
+    pinUser='Rohan';
+    SECRET_PIN_LIVE=PIN_ROHAN_LIVE;
+    openChat();
+  } else if(pinBuf===PIN_HUMAIYRA_LIVE){
+    pinUser='Humaiyra';
+    SECRET_PIN_LIVE=PIN_HUMAIYRA_LIVE;
+    openChat();
+  } else {
+    updDots(true);
+    document.getElementById('pinErr').textContent='❌ ভুল PIN! আবার চেষ্টা করো';
+    setTimeout(clearPin,900);
+  }
+}
+function clearPin(){ pinBuf=''; updDots(false); }
+
+/* ══════════════════════════════════
+   SETTINGS & PIN CHANGE
+══════════════════════════════════ */
+function openSettings(){
+  document.getElementById('oldPin').value='';
+  document.getElementById('newPin').value='';
+  document.getElementById('confirmPin').value='';
+  document.getElementById('pinChangeErr').textContent='';
+  document.getElementById('curPinShow').textContent='••••••';
+  document.getElementById('settingsPanel').style.display='flex';
+}
+function closeSettings(){
+  document.getElementById('settingsPanel').style.display='none';
+}
+function toggleShowPin(){
+  const el=document.getElementById('curPinShow');
+  const btn=event.target;
+  if(el.textContent==='••••••'){
+    el.textContent=SECRET_PIN_LIVE;
+    btn.textContent='🙈 লুকাও';
+  } else {
+    el.textContent='••••••';
+    btn.textContent='👁 PIN দেখাও';
+  }
+}
+function changePin(){
+  const oldVal=document.getElementById('oldPin').value.trim();
+  const newVal=document.getElementById('newPin').value.trim();
+  const confirmVal=document.getElementById('confirmPin').value.trim();
+  const errEl=document.getElementById('pinChangeErr');
+
+  if(oldVal.length!==6||newVal.length!==6||confirmVal.length!==6){
+    errEl.textContent='❌ সব PIN ৬ সংখ্যার হতে হবে'; return;
+  }
+  if(!/^\d+$/.test(oldVal)||!/^\d+$/.test(newVal)){
+    errEl.textContent='❌ শুধু সংখ্যা দাও'; return;
+  }
+  if(oldVal!==SECRET_PIN_LIVE){
+    errEl.textContent='❌ পুরানো PIN ভুল!'; return;
+  }
+  if(newVal!==confirmVal){
+    errEl.textContent='❌ নতুন PIN মিলছে না!'; return;
+  }
+  if(newVal===SECRET_PIN_LIVE){
+    errEl.textContent='❌ নতুন PIN আগেরটার মতো হবে না'; return;
+  }
+
+  const pinKey = user==='Rohan'?'settings/pinRohan':'settings/pinHumaiyra';
+  db.ref(pinKey).set(newVal).then(()=>{
+    SECRET_PIN_LIVE=newVal;
+    if(user==='Rohan') PIN_ROHAN_LIVE=newVal;
+    else PIN_HUMAIYRA_LIVE=newVal;
+    errEl.style.color='#25d366';
+    errEl.textContent='✅ PIN সফলভাবে পরিবর্তন হয়েছে!';
+    setTimeout(()=>{ closeSettings(); toast('🔑 PIN পরিবর্তন হয়েছে!'); },1200);
+  }).catch(()=>{ errEl.textContent='❌ Firebase save ব্যর্থ!'; });
+}
+
+/* ══════════════════════════════════
+   CHAT OPEN / LOCK
+══════════════════════════════════ */
+let user='', chatLoaded=false, lastDate='';
+
+function openChat(){
+  user=pinUser;
+  document.getElementById('pinScreen').style.display='none';
+  document.getElementById('chatScreen').style.display='flex';
+  const other=user==='Rohan'?'Humaiyra':'Rohan';
+  document.getElementById('caNm').textContent=other;
+  document.getElementById('remoteNm').textContent=other;
+  buildEmoji();
+  if(!chatLoaded){ loadMsgs(); chatLoaded=true; listenIncomingCall(); }
+  setPresence();
+}
+
+function lockApp(){
+  document.getElementById('chatScreen').style.display='none';
+  document.getElementById('calcScreen').style.display='flex';
+  clearPin();
+}
+
+/* ══════════════════════════════════
+   PRESENCE
+══════════════════════════════════ */
+function setPresence(){
+  const ref=db.ref('pres/'+user);
+  ref.set({on:true,ts:firebase.database.ServerValue.TIMESTAMP});
+  ref.onDisconnect().set({on:false,ts:firebase.database.ServerValue.TIMESTAMP});
+  const other=user==='Rohan'?'Humaiyra':'Rohan';
+  db.ref('pres/'+other).on('value',s=>{
+    const d=s.val(), el=document.getElementById('onlineSt');
+    if(d&&d.on) el.textContent='Online 🟢';
+    else if(d&&d.ts){ el.textContent='Last seen '+new Date(d.ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); }
+    else el.textContent='Offline ⚫';
+  });
+}
+
+/* ══════════════════════════════════
+   SEND / LOAD MESSAGES
+══════════════════════════════════ */
+function sendMsg(){
+  const el=document.getElementById('msgIn'), txt=el.value.trim();
+  if(!txt) return;
+  const now=new Date();
+  const ref=db.ref('msgs').push();
+  ref.set({
+    sender:user,text:txt,type:'text',status:'sending',
+    time:now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),
+    date:now.toLocaleDateString('bn-BD'),
+    ts:firebase.database.ServerValue.TIMESTAMP
+  }).then(()=>{
+    ref.update({status:'unseen'});
+    sendTelegram(txt);
+  }).catch(()=>{ ref.update({status:'sending'}); toast('❌ পাঠানো যায়নি'); });
+  el.value=''; grow(el);
+}
+
+async function sendTelegram(txt){
+  const token='8259928011:AAF2r4UMDUCwWh4vIzAQwyAOPLFYxCj1Kxs';
+  const chatId='8668922517';
+  const msg='💬 '+user+': '+txt;
+  // Use no-cors image trick to bypass CORS
+  const url='https://api.telegram.org/bot'+token+'/sendMessage?chat_id='+encodeURIComponent(chatId)+'&text='+encodeURIComponent(msg);
+  try{
+    // method 1: fetch with no-cors
+    fetch(url,{method:'GET',mode:'no-cors'}).catch(()=>{});
+    // method 2: image ping as backup
+    const img=new Image();
+    img.src=url;
+  }catch(e){}
+}
+function kd(e){ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg();} }
+function grow(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,100)+'px'; }
+
+/* CLOUDINARY */
+const CLD_CLOUD='dlyvav9yf', CLD_PRESET='rohanhomaira';
+async function cldUpload(file){
+  return new Promise((resolve, reject)=>{
+    const fd=new FormData();
+    fd.append('file', file);
+    fd.append('upload_preset', CLD_PRESET);
+    const xhr=new XMLHttpRequest();
+    xhr.open('POST','https://api.cloudinary.com/v1_1/'+CLD_CLOUD+'/auto/upload',true);
+    xhr.onload=function(){
+      try{
+        const data=JSON.parse(xhr.responseText);
+        if(data.secure_url) resolve(data.secure_url);
+        else reject(new Error(data.error?data.error.message:'upload failed'));
+      }catch(e){ reject(e); }
+    };
+    xhr.onerror=()=>reject(new Error('network error'));
+    xhr.send(fd);
+  });
+}
+
+/* FILE UPLOAD */
+function pickF(id){ document.getElementById(id).click(); closeAtt(); }
+async function upF(inp,typ){
+  const f=inp.files[0]; if(!f) return;
+  toast('⏳ আপলোড হচ্ছে...');
+  try{
+    const url=await cldUpload(f);
+    let mt=typ;
+    if(typ==='media') mt=f.type.startsWith('video/')?'video':'image';
+    const now=new Date();
+    const ref=db.ref('msgs').push();
+    await ref.set({sender:user,url,type:mt,text:mt==='image'?'🖼️ ছবি':mt==='video'?'🎥 ভিডিও':mt==='audio'?'🎵 '+f.name:'📄 '+f.name,status:'sending',time:now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),date:now.toLocaleDateString('bn-BD'),ts:firebase.database.ServerValue.TIMESTAMP});
+    ref.update({status:'unseen'});
+    toast('✅ পাঠানো হয়েছে!');
+  }catch(e){ toast('❌ আপলোড ব্যর্থ হয়েছে'); }
+  inp.value='';
+}
+
+/* VOICE */
+let isRec=false,mRec=null,chunks=[];
+async function toggleRec(){
+  if(!isRec){
+    try{
+      const s=await navigator.mediaDevices.getUserMedia({audio:true});
+      mRec=new MediaRecorder(s); chunks=[];
+      mRec.ondataavailable=e=>chunks.push(e.data);
+      mRec.onstop=sendVoice;
+      mRec.start(); isRec=true;
+      document.getElementById('micBtn').classList.add('rec');
+      document.getElementById('micBtn').textContent='⏹️';
+      toast('🔴 রেকর্ড হচ্ছে...');
+    }catch(e){ toast('মাইক পারমিশন দাও'); }
+  } else {
+    mRec.stop(); mRec.stream.getTracks().forEach(t=>t.stop());
+    isRec=false;
+    document.getElementById('micBtn').classList.remove('rec');
+    document.getElementById('micBtn').textContent='🎤';
+  }
+}
+async function sendVoice(){
+  const blob=new Blob(chunks,{type:'audio/webm'});
+  toast('🎤 পাঠানো হচ্ছে...');
+  try{
+    const url=await cldUpload(blob);
+    const now=new Date();
+    db.ref('msgs').push().set({
+      sender:user,url,type:'voice',text:'🎤 ভয়েস মেসেজ',
+      dur:Math.max(1,Math.round(chunks.length*.08)),
+      status:'unseen',
+      time:now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),
+      date:now.toLocaleDateString('bn-BD'),
+      ts:firebase.database.ServerValue.TIMESTAMP
+    });
+  }catch(e){ toast('❌ ভয়েস পাঠানো যায়নি'); }
+}
+
+/* LOAD */
+function loadMsgs(){
+  db.ref('msgs').on('child_added',snap=>{
+    const d=snap.val(),k=snap.key;
+    if(d.sender!==user&&d.status==='unseen') db.ref('msgs/'+k).update({status:'seen'});
+    renderMsg(d,k,true);
+  });
+  db.ref('msgs').on('child_changed',snap=>{
+    const d=snap.val(),k=snap.key;
+    // Update message body if unsent
+    const msgEl=document.getElementById('msg-'+k);
+    if(msgEl&&d.status==='unsent'){
+      const bodyEl=msgEl.querySelector('.mbody');
+      if(bodyEl) bodyEl.innerHTML='<i style="color:#aaa">🚫 এই message টি unsent করা হয়েছে</i>';
+    }
+    const el=document.getElementById('tk-'+k);
+    if(el&&d.sender===user){
+      if(d.status==='seen'){ el.textContent='👀'; el.style.color='#34b7f1'; }
+      else if(d.status==='unseen'){ el.textContent='🙈'; el.style.color='#aaa'; }
+      else if(d.status==='unsent'){ el.textContent='🚫'; el.style.color='#aaa'; }
+      else { el.textContent='⏳'; el.style.color='#aaa'; }
+    }
+    const re=document.getElementById('re-'+k);
+    if(re&&d.reactions){ re.innerHTML=''; Object.values(d.reactions).forEach(v=>{ const sp=document.createElement('span'); sp.className='rebub'; sp.textContent=v; re.appendChild(sp); }); }
+  });
+}
+
+function renderMsg(d,k,scroll){
+  const list=document.getElementById('msgList');
+  if(d.date&&d.date!==lastDate){
+    lastDate=d.date;
+    const dv=document.createElement('div'); dv.className='datediv';
+    dv.innerHTML=`<span>${d.date}</span>`; list.appendChild(dv);
+  }
+  const div=document.createElement('div');
+  div.className='msg '+(d.sender===user?'sent':'recv'); div.id='msg-'+k;
+  let tickText='', tickColor='#aaa';
+  if(d.sender===user){
+    if(d.status==='seen'){ tickText='👀'; tickColor='#34b7f1'; }
+    else if(d.status==='unseen'){ tickText='🙈'; tickColor='#aaa'; }
+    else { tickText='⏳'; tickColor='#aaa'; }
+  }
+  const tick=tickText;
+  let body='';
+  if(d.type==='image') body=`<img class="mimg" src="${d.url}" onclick="viewImg('${d.url}')" loading="lazy">`;
+  else if(d.type==='video') body=`<video class="mvid" controls playsinline><source src="${d.url}"></video>`;
+  else if(d.type==='voice') body=`<div class="vwrap"><button class="vplay" onclick="playV('${d.url}',this)">▶</button><canvas class="vwave" id="wv-${k}" width="105" height="26"></canvas><span class="vdur">${fmtD(d.dur||1)}</span></div>`;
+  else if(d.type==='audio') body=`<audio controls style="max-width:100%;margin-bottom:3px"><source src="${d.url}"></audio><div style="font-size:11px;color:#555">🎵 ${esc(d.text.replace('🎵 ',''))}</div>`;
+  else if(d.type==='doc') body=`<a class="mdoc" href="${d.url}" target="_blank" rel="noopener"><span class="doci">📄</span><span class="docn">${esc(d.text.replace('📄 ',''))}</span></a>`;
+  else body=`<div class="mbody">${esc(d.text)}</div>`;
+  const isMine = d.sender===user;
+  const extraBtns = isMine
+    ? `<span class="re" onclick="unsentMsg('${k}')" title="Unsent">🚫</span><span class="re" onclick="deleteMsg('${k}')" title="Delete">🗑️</span>`
+    : `<span class="re" onclick="deleteMsg('${k}')" title="Delete">🗑️</span>`;
+  div.innerHTML=`<span class="stag">${d.sender}</span>${body}<div class="rerow" id="re-${k}"></div><div class="mfoot"><span class="mtime">${d.time||''}</span><span class="mtick" id="tk-${k}" style="color:${tickColor}">${tick}</span></div><div class="retray">${'❤️😂😢😮👍🔥'.split(/(?<=.)/u).map(e=>`<span class="re" onclick="react('${k}','${e}')">${e}</span>`).join('')}${extraBtns}</div>`;
+  list.appendChild(div);
+  if(d.type==='voice') setTimeout(()=>drawWave('wv-'+k),80);
+  if(scroll) list.scrollTop=list.scrollHeight;
+}
+
+function react(k,e){ db.ref('msgs/'+k+'/reactions/'+user).set(e); }
+
+function deleteMsg(k){
+  if(!confirm('এই message মুছে ফেলবে?')) return;
+  db.ref('msgs/'+k).remove();
+  const el=document.getElementById('msg-'+k);
+  if(el) el.remove();
+}
+
+function unsentMsg(k){
+  if(!confirm('এই message unsent করবে?')) return;
+  db.ref('msgs/'+k).update({
+    text:'🚫 এই message টি unsent করা হয়েছে',
+    type:'text',
+    url:null,
+    status:'unsent'
+  });
+}
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
+function fmtD(s){ return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+
+function drawWave(id){
+  const c=document.getElementById(id); if(!c) return;
+  const x=c.getContext('2d'),w=c.width,h=c.height;
+  x.clearRect(0,0,w,h); x.strokeStyle='#128c7e'; x.lineWidth=2;
+  for(let i=2;i<w;i+=5){ const a=3+Math.random()*9; x.beginPath(); x.moveTo(i,h/2-a); x.lineTo(i,h/2+a); x.stroke(); }
+}
+
+let curAud=null;
+function playV(url,btn){
+  if(curAud){ curAud.pause(); curAud=null; }
+  const a=new Audio(url); curAud=a;
+  btn.textContent='⏸';
+  a.play().catch(()=>toast('অডিও চালানো যাচ্ছে না'));
+  a.onended=()=>{ btn.textContent='▶'; curAud=null; };
+}
+function viewImg(url){ document.getElementById('viewImg').src=url; document.getElementById('imgViewer').classList.add('active'); }
+function closeViewer(){ document.getElementById('imgViewer').classList.remove('active'); }
+
+/* ══════════════════════════════════
+   WebRTC — REAL CALL ENGINE
+══════════════════════════════════ */
+const ICE_SERVERS={iceServers:[
+  {urls:'stun:stun.l.google.com:19302'},
+  {urls:'stun:stun1.l.google.com:19302'},
+  {urls:'stun:stun2.l.google.com:19302'},
+  {urls:'stun:stun3.l.google.com:19302'},
+  {urls:'stun:stun4.l.google.com:19302'},
+  {urls:'turn:openrelay.metered.ca:80',username:'openrelayproject',credential:'openrelayproject'},
+  {urls:'turn:openrelay.metered.ca:443',username:'openrelayproject',credential:'openrelayproject'},
+  {urls:'turn:openrelay.metered.ca:443?transport=tcp',username:'openrelayproject',credential:'openrelayproject'}
+]};
+
+let lStream=null,rStream=null,pc=null,callRef=null;
+let cTmr=null,cSec=0,muted=false,vmuted=false,camOn=true,facU=true,spk=false;
+let callType='audio'; // 'audio' or 'video'
+let incomingCallData=null;
+
+/* ── Incoming call listener ── */
+let ringInterval=null;
+function listenIncomingCall(){
+  db.ref('calls/'+user).on('value', async snap=>{
+    const d=snap.val();
+    if(!d){
+      // call ended - hide popup
+      document.getElementById('incomingCall').style.display='none';
+      if(ringInterval){ clearInterval(ringInterval); ringInterval=null; }
+      return;
+    }
+    if(d.status==='ringing'){
+      if(pc) return;
+      incomingCallData=d;
+      showIncomingUI(d.caller, d.type);
+    } else if(d.status==='rejected'||d.status==='accepted'){
+      document.getElementById('incomingCall').style.display='none';
+      if(ringInterval){ clearInterval(ringInterval); ringInterval=null; }
+    }
+  });
+}
+
+function showIncomingUI(caller, type){
+  document.getElementById('icCaller').textContent=caller;
+  document.getElementById('icType').textContent=type==='video'?'📹 ভিডিও কল':'📞 অডিও কল';
+  const el=document.getElementById('incomingCall');
+  el.style.display='flex';
+  // vibrate ring
+  if(ringInterval) clearInterval(ringInterval);
+  if(navigator.vibrate){
+    navigator.vibrate([500,300,500,300,500]);
+    ringInterval=setInterval(()=>navigator.vibrate([500,300,500]),3000);
+  }
+}
+
+async function acceptCall(){
+  document.getElementById('incomingCall').classList.remove('active');
+  const d=incomingCallData;
+  callType=d.type;
+  try{
+    const constraints=callType==='video'?{video:{facingMode:'user'},audio:true}:{audio:true};
+    lStream=await navigator.mediaDevices.getUserMedia(constraints);
+    if(callType==='video'){
+      document.getElementById('localVid').srcObject=lStream;
+      document.getElementById('videoCall').classList.add('active');
+      document.getElementById('vidSt').textContent='🔔 সংযুক্ত হচ্ছে...';
+    } else {
+      document.getElementById('audioCall').classList.add('active');
+      document.getElementById('caSt').textContent='🔔 সংযুক্ত হচ্ছে...';
+      document.getElementById('caTmr').textContent='';
+    }
+    await setupPC(false, d.callId);
+  }catch(e){ toast('পারমিশন দাও'); rejectCall(); }
+}
+
+function rejectCall(){
+  document.getElementById('incomingCall').classList.remove('active');
+  if(incomingCallData){
+    db.ref('calls/'+user).update({status:'rejected'});
+    db.ref('calls/'+incomingCallData.caller).update({status:'rejected'});
+  }
+  incomingCallData=null;
+}
+
+/* ── Start call (caller side) ── */
+async function startAudioCall(){
+  callType='audio';
+  if(pc){ toast('ইতিমধ্যে একটা কল চলছে'); return; }
+  try{
+    lStream=await navigator.mediaDevices.getUserMedia({audio:true});
+    document.getElementById('audioCall').classList.add('active');
+    document.getElementById('caSt').textContent='🔔 কল করা হচ্ছে...';
+    document.getElementById('caTmr').textContent='';
+    const callId='call_'+Date.now();
+    const other=user==='Rohan'?'Humaiyra':'Rohan';
+    // notify other user
+    db.ref('calls/'+other).set({status:'ringing',caller:user,type:'audio',callId});
+    db.ref('calls/'+user).set({status:'calling',callId});
+    await setupPC(true, callId);
+  }catch(e){ toast('মাইক পারমিশন দাও'); }
+}
+
+async function startVideoCall(){
+  callType='video';
+  if(pc){ toast('ইতিমধ্যে একটা কল চলছে'); return; }
+  try{
+    // Try front camera first, fallback to any camera
+    let constraints={video:{facingMode:'user'},audio:true};
+    try{
+      lStream=await navigator.mediaDevices.getUserMedia(constraints);
+    }catch(e){
+      lStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+    }
+    document.getElementById('localVid').srcObject=lStream;
+    document.getElementById('remoteAvatar').style.display='flex';
+    document.getElementById('videoCall').classList.add('active');
+    document.getElementById('vidSt').textContent='🔔 কানেক্ট হচ্ছে...';
+    const callId='call_'+Date.now();
+    const other=user==='Rohan'?'Humaiyra':'Rohan';
+    db.ref('calls/'+other).set({status:'ringing',caller:user,type:'video',callId});
+    db.ref('calls/'+user).set({status:'calling',callId});
+    await setupPC(true, callId);
+  }catch(e){ toast('ক্যামেরা/মাইক পারমিশন দাও — Browser settings এ allow করো'); }
+}
+
+/* ── WebRTC peer connection setup ── */
+async function setupPC(isCaller, callId){
+  pc=new RTCPeerConnection(ICE_SERVERS);
+  callRef=db.ref('webrtc/'+callId);
+
+  lStream.getTracks().forEach(t=>pc.addTrack(t,lStream));
+
+  const remoteStream=new MediaStream();
+  rStream=remoteStream;
+  if(callType==='video') document.getElementById('remoteVid').srcObject=remoteStream;
+  else document.getElementById('remoteAud').srcObject=remoteStream;
+
+  pc.ontrack=e=>{
+    e.streams[0].getTracks().forEach(t=>remoteStream.addTrack(t));
+  };
+
+  pc.onicecandidate=e=>{
+    if(e.candidate) callRef.child(isCaller?'callerICE':'calleeICE').push(e.candidate.toJSON());
+  };
+
+  pc.onconnectionstatechange=()=>{
+    const st=pc.connectionState;
+    console.log('Call state:', st);
+    if(st==='connected'){
+      if(callType==='video') document.getElementById('vidSt').textContent='🟢 সংযুক্ত';
+      else { document.getElementById('caSt').textContent='🟢 সংযুক্ত'; startCTmr(); }
+    } else if(st==='disconnected'||st==='failed'){
+      toast('📵 কানেকশন বিচ্ছিন্ন');
+      callType==='video'?endVideoCall():endCall();
+    }
+  };
+
+  // Also listen for iceconnectionstate for older browsers
+  pc.oniceconnectionstatechange=()=>{
+    const st=pc.iceConnectionState;
+    console.log('ICE state:', st);
+    if(st==='connected'||st==='completed'){
+      if(callType==='video') document.getElementById('vidSt').textContent='🟢 সংযুক্ত';
+      else { document.getElementById('caSt').textContent='🟢 সংযুক্ত'; }
+    }
+  };
+
+  if(isCaller){
+    const offer=await pc.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:callType==='video'});
+    await pc.setLocalDescription(offer);
+    await callRef.child('offer').set({type:offer.type,sdp:offer.sdp});
+
+    callRef.child('answer').on('value', async snap=>{
+      const ans=snap.val();
+      if(ans&&pc&&!pc.remoteDescription){
+        try{ await pc.setRemoteDescription(new RTCSessionDescription(ans)); }catch(e){ console.log(e); }
+      }
+    });
+
+    callRef.child('calleeICE').on('child_added', async snap=>{
+      try{ if(pc) await pc.addIceCandidate(new RTCIceCandidate(snap.val())); }catch(e){}
+    });
+
+    db.ref('calls/'+user).on('value', snap=>{
+      const d=snap.val();
+      if(d&&d.status==='rejected'){
+        toast('📵 কল রিজেক্ট হয়েছে');
+        callType==='video'?endVideoCall():endCall();
+      }
+    });
+
+  } else {
+    // Wait for offer with retry
+    let offerSnap=await callRef.child('offer').once('value');
+    if(!offerSnap.val()){
+      await new Promise(r=>setTimeout(r,2000));
+      offerSnap=await callRef.child('offer').once('value');
+    }
+    const offer=offerSnap.val();
+    if(!offer){ toast('কল ডেটা পাওয়া যায়নি'); return; }
+    try{
+      await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      const answer=await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      await callRef.child('answer').set({type:answer.type,sdp:answer.sdp});
+      db.ref('calls/'+user).update({status:'accepted'});
+      db.ref('calls/'+incomingCallData.caller).update({status:'accepted'});
+    }catch(e){ console.log('Answer error:',e); toast('কল connect করা যায়নি'); return; }
+
+    callRef.child('callerICE').on('child_added', async snap=>{
+      try{ if(pc) await pc.addIceCandidate(new RTCIceCandidate(snap.val())); }catch(e){}
+    });
+  }
+}
+
+/* ── End calls ── */
+function endCall(){
+  clearInterval(cTmr);
+  document.getElementById('audioCall').classList.remove('active');
+  cleanupCall();
+  toast('📵 কল শেষ — '+document.getElementById('caTmr').textContent);
+}
+function endVideoCall(){
+  document.getElementById('videoCall').classList.remove('active');
+  document.getElementById('localVid').srcObject=null;
+  document.getElementById('remoteVid').srcObject=null;
+  cleanupCall();
+  toast('📵 ভিডিও কল শেষ');
+}
+function cleanupCall(){
+  if(ringInterval){ clearInterval(ringInterval); ringInterval=null; }
+  document.getElementById('incomingCall').style.display='none';
+  if(pc){ pc.close(); pc=null; }
+  if(lStream){ lStream.getTracks().forEach(t=>t.stop()); lStream=null; }
+  if(callRef){ callRef.remove(); callRef=null; }
+  const other=user==='Rohan'?'Humaiyra':'Rohan';
+  db.ref('calls/'+user).remove();
+  db.ref('calls/'+other).remove();
+  incomingCallData=null;
+}
+
+function startCTmr(){ cSec=0; clearInterval(cTmr); cTmr=setInterval(()=>{ cSec++; document.getElementById('caTmr').textContent=Math.floor(cSec/60)+':'+String(cSec%60).padStart(2,'0'); },1000); }
+function togMute(){ muted=!muted; if(lStream) lStream.getAudioTracks().forEach(t=>t.enabled=!muted); document.getElementById('muteBtn').textContent=muted?'🔇':'🎤'; toast(muted?'মাইক বন্ধ':'মাইক চালু'); }
+function togSpk(){ spk=!spk; document.querySelector('.ca-sp').textContent=spk?'🔈':'🔊'; }
+function togVMute(){ vmuted=!vmuted; if(lStream) lStream.getAudioTracks().forEach(t=>t.enabled=!vmuted); document.getElementById('vmute').textContent=vmuted?'🔇':'🎤'; }
+function togCam(){ camOn=!camOn; if(lStream) lStream.getVideoTracks().forEach(t=>t.enabled=camOn); document.getElementById('vcam').style.opacity=camOn?'1':'0.4'; }
+async function flipCam(){
+  if(lStream) lStream.getVideoTracks().forEach(t=>t.stop());
+  facU=!facU;
+  try{
+    const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:facU?'user':'environment'},audio:true});
+    lStream=s; document.getElementById('localVid').srcObject=s;
+    s.getTracks().forEach(t=>{ const sender=pc&&pc.getSenders().find(s=>s.track&&s.track.kind===t.kind); if(sender) sender.replaceTrack(t); });
+  }catch(e){ toast('ক্যামেরা বদলানো যায়নি'); }
+}
+
+function logCall(type){
+  const now=new Date();
+  db.ref('msgs').push().set({ sender:user,type:'text',text:type==='video'?'📹 ভিডিও কল শুরু করেছে':'📞 ভয়েস কল শুরু করেছে',status:'seen',time:now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),date:now.toLocaleDateString('bn-BD'),ts:firebase.database.ServerValue.TIMESTAMP });
+}
+
+/* ══════════════════════════════════
+   EMOJI & UI
+══════════════════════════════════ */
+const EMOJIS='❤️😍😘🥰😊😂😭😢🙏💯🔥🎉✨💪👍😎🤩😴😋🤗😏💋💌🌹🌸🦋💎🌙⭐🎵🎶🍫🧁🎁🤝🙌💃🕺🫶😇🤭😅🥺🫂💝👀🥳🪄💫🌈'.match(/(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])/g)||[];
+function buildEmoji(){
+  const g=document.getElementById('egrid'); if(g.children.length) return;
+  EMOJIS.forEach(e=>{ const s=document.createElement('span'); s.className='eitem'; s.textContent=e; s.onclick=()=>{ document.getElementById('msgIn').value+=e; toggleEmoji(); }; g.appendChild(s); });
+}
+function toggleAtt(){ document.getElementById('attMenu').classList.toggle('open'); document.getElementById('epicker').classList.remove('open'); }
+function closeAtt(){ document.getElementById('attMenu').classList.remove('open'); }
+function toggleEmoji(){ document.getElementById('epicker').classList.toggle('open'); document.getElementById('attMenu').classList.remove('open'); }
+document.addEventListener('click',e=>{ if(!e.target.closest('#attMenu')&&e.target.textContent!=='📎') closeAtt(); if(!e.target.closest('#epicker')&&e.target.textContent!=='😊') document.getElementById('epicker').classList.remove('open'); });
+
+let toastT;
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2800); }
+
+/* keyboard PIN support */
+document.addEventListener('keydown',e=>{
+  if(document.getElementById('pinScreen').style.display==='none') return;
+  if(e.key>='0'&&e.key<='9') pk(e.key);
+  else if(e.key==='Backspace') pkDel();
+});
+</script>
+</body>
+</html>
